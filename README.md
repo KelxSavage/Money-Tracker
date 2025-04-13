@@ -17,7 +17,7 @@ This is a simple and stylish web-based calculator to help you figure out how muc
 
 ![screenshot](screenshot.png) <!-- Replace with actual screenshot if uploading -->
 
-## 🛠️ How to Use
+## 🛠️ How to Use_
 
 1. Clone or download this repository:
    ```bash
