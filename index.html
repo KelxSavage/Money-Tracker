@@ -1,35 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>💰 Daily Goal Tracker</title>
   <style>
+    :root {
+      --bg-light: #ffffff;
+      --bg-dark: #1f2937;
+      --text-light: #1e3a8a;
+      --text-dark: #d1d5db;
+      --primary: #3b82f6;
+      --accent: #eff6ff;
+    }
+
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #dbeafe, #bfdbfe);
       margin: 0;
       padding: 0;
+      background: linear-gradient(to right, #dbeafe, #bfdbfe);
+      color: var(--text-light);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
     }
 
     .container {
       max-width: 500px;
       margin: 50px auto;
-      background-color: #ffffff;
+      background-color: var(--bg-light);
       padding: 30px 25px;
       border-radius: 15px;
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      transition: background 0.3s;
+    }
+
+    body.dark .container {
+      background-color: #374151;
     }
 
     h2 {
       text-align: center;
-      color: #1e40af;
+      color: var(--primary);
       margin-bottom: 25px;
     }
 
     label {
       display: block;
       margin-top: 15px;
-      color: #1e3a8a;
       font-weight: 600;
     }
 
@@ -41,35 +62,76 @@
       border-radius: 8px;
       font-size: 16px;
       box-sizing: border-box;
+      background: white;
+      color: black;
     }
 
-    #calculateBtn {
+    body.dark input, body.dark select {
+      background: #1e293b;
+      color: white;
+      border-color: #60a5fa;
+    }
+
+    #calculateBtn, #darkModeToggle {
       display: block;
-      margin: 30px auto 0;
-      padding: 12px 24px;
-      background-color: #3b82f6;
+      width: 100%;
+      margin-top: 25px;
+      padding: 12px;
+      background-color: var(--primary);
       color: white;
       font-size: 16px;
       font-weight: bold;
       border: none;
       border-radius: 30px;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-      transition: background 0.3s ease;
-    }
-
-    #calculateBtn:hover {
-      background-color: #2563eb;
     }
 
     .result {
       margin-top: 25px;
-      background-color: #eff6ff;
-      border-left: 5px solid #3b82f6;
+      background-color: var(--accent);
+      border-left: 5px solid var(--primary);
       padding: 15px 20px;
       border-radius: 10px;
       font-size: 17px;
-      color: #1e3a8a;
+    }
+
+    .progress-bar {
+      margin-top: 10px;
+      height: 20px;
+      width: 100%;
+      background-color: #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: #3b82f6;
+      width: 0;
+      transition: width 0.4s ease;
+    }
+
+    #encouragement {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: #10b981;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-weight: bold;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      opacity: 1;
+      transition: opacity 0.5s ease-in-out;
+      z-index: 9999;
+      max-width: 250px;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 20px 15px;
+      }
     }
   </style>
 </head>
@@ -88,33 +150,56 @@
     <input type="month" id="month" />
 
     <button id="calculateBtn" onclick="calculate()">Calculate</button>
+    <button id="darkModeToggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
 
     <div class="result" id="output"></div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="progressBar"></div></div>
   </div>
 
+  <div id="encouragement"></div>
+
   <script>
-    // Auto-fill current month on load
+    const goalInput = document.getElementById('goal');
+    const currentInput = document.getElementById('current');
+    const monthInput = document.getElementById('month');
+    const output = document.getElementById('output');
+    const progressBar = document.getElementById('progressBar');
+    const encouragement = document.getElementById('encouragement');
+
+    const encouragementShown = JSON.parse(localStorage.getItem('encouragementShown') || '{}');
+
     window.onload = function () {
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
-      document.getElementById('month').value = `${year}-${month}`;
+      monthInput.value = `${year}-${month}`;
+
+      const saved = JSON.parse(localStorage.getItem('goalTrackerData') || '{}');
+      if (saved.goal) goalInput.value = saved.goal;
+      if (saved.current) currentInput.value = saved.current;
+      if (saved.month) monthInput.value = saved.month;
+
+      const dark = localStorage.getItem('darkMode');
+      if (dark === 'true') document.body.classList.add('dark');
+
+      if (saved.goal || saved.current) {
+        const ask = confirm(`You previously saved $${saved.current} toward a $${saved.goal} goal. Update it now?`);
+        if (ask) calculate();
+      }
     };
 
     function getBusinessDaysLeftInMonth(monthYearStr) {
       const today = new Date();
       const [year, month] = monthYearStr.split('-').map(Number);
       const startDate = new Date(Math.max(today, new Date(year, month - 1, 1)));
-      const endDate = new Date(year, month, 0); // Last day of target month
+      const endDate = new Date(year, month, 0);
 
       let count = 0;
       let current = new Date(startDate);
 
       while (current <= endDate) {
         const day = current.getDay();
-        if (day !== 0 && day !== 6) {
-          count++;
-        }
+        if (day !== 0 && day !== 6) count++;
         current.setDate(current.getDate() + 1);
       }
 
@@ -122,12 +207,9 @@
     }
 
     function calculate() {
-      const goal = parseFloat(document.getElementById('goal').value);
-      const current = parseFloat(document.getElementById('current').value);
-      const monthStr = document.getElementById('month').value;
-
-      const output = document.getElementById('output');
-      output.innerHTML = "";
+      const goal = parseFloat(goalInput.value);
+      const current = parseFloat(currentInput.value);
+      const monthStr = monthInput.value;
 
       if (!monthStr || isNaN(goal) || isNaN(current)) {
         output.innerText = "⚠️ Please fill in all fields with valid values.";
@@ -135,21 +217,60 @@
       }
 
       const days = getBusinessDaysLeftInMonth(monthStr);
-
       if (days <= 0) {
         output.innerText = "🎉 No business days left in that month!";
         return;
       }
 
-      const remaining = goal - current;
+      const remaining = Math.max(goal - current, 0);
       const perDay = remaining / days;
-      const progress = (current / goal) * 100;
+      const progress = Math.min((current / goal) * 100, 100);
 
       output.innerHTML = `
         📆 <strong>${days}</strong> business days remaining this month<br>
         💵 Daily target: <strong>$${perDay.toFixed(2)}</strong><br>
         ✅ Progress: <strong>${progress.toFixed(2)}%</strong> toward your goal
       `;
+
+      progressBar.style.width = `${progress}%`;
+
+      localStorage.setItem('goalTrackerData', JSON.stringify({ goal, current, month: monthStr }));
+      checkEncouragement(progress);
+    }
+
+    function checkEncouragement(progress) {
+    if (progress >= 100 && !encouragementShown['100']) {
+        showEncouragement("🎯 100%! Goal achieved — LETSSS GOOOOO!!!", '100');
+    } else if (progress >= 90 && !encouragementShown['90']) {
+        showEncouragement("💥 90%! You're in the final stretch!", '90');
+    } else if (progress >= 75 && !encouragementShown['75']) {
+        showEncouragement("🔥 75%! You're doing amazing!", '75');
+    } else if (progress >= 50 && !encouragementShown['50']) {
+        showEncouragement("🚀 50% reached! Keep pushing!", '50');
+    } else if (progress >= 20 && !encouragementShown['20']) {
+        showEncouragement("👏 20%! You're off to a great start!", '20');
+    } else if (progress >= 10 && !encouragementShown['10']) {
+        showEncouragement("🎉 10% down! Let’s go!", '10');
+    }
+}
+
+    function showEncouragement(message, key) {
+      encouragementShown[key] = true;
+      localStorage.setItem('encouragementShown', JSON.stringify(encouragementShown));
+
+      encouragement.textContent = message;
+      encouragement.style.display = 'block';
+      encouragement.style.opacity = '1';
+
+      setTimeout(() => {
+        encouragement.style.opacity = '0';
+        setTimeout(() => encouragement.style.display = 'none', 1000);
+      }, 120000); // 2 minutes
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
     }
   </script>
 
